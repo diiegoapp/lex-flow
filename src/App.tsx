@@ -106,6 +106,7 @@ export default function App() {
           logs: addLog(prev.logs, 'Processo encontrado com sucesso!', 'success'),
         }));
         setResultData(data.dados);
+        if (data.arquivo_url) setDownloadUrl(data.arquivo_url);
         addToast('Processo consultado com sucesso!', 'success');
         setTimeout(() => {
           setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
@@ -378,14 +379,26 @@ export default function App() {
                     onTryAgain={handleReset}
                   />
                 ) : (
-                  <ResultCard result={resultData} />
+                  <>
+                    <ResultCard result={resultData} />
+                    {downloadUrl && (
+                      <ResultArea
+                        fileName={`resultado_${resultData.numero_cnj.replace(/\D/g, '').slice(0, 7)}.xlsx`}
+                        processedCount={1}
+                        onDownload={handleDownload}
+                        onReset={handleReset}
+                      />
+                    )}
+                  </>
                 )}
-                <button
-                  onClick={handleReset}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm font-medium transition-all duration-200"
-                >
-                  Nova Consulta
-                </button>
+                {!downloadUrl && (
+                  <button
+                    onClick={handleReset}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm font-medium transition-all duration-200"
+                  >
+                    Nova Consulta
+                  </button>
+                )}
               </div>
             </div>
           )}

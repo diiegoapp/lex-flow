@@ -38,6 +38,10 @@ export interface ConsultaResponse {
   sucesso: boolean;
   dados?: ProcessResult;
   erro?: string;
+  arquivo_url?: string;
+  total_processados?: number;
+  total_sucesso?: number;
+  total_erro?: number;
 }
 
 export interface PlanilhaResponse {
