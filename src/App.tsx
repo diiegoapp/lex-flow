@@ -6,6 +6,8 @@ import SingleProcessTab from './components/SingleProcessTab';
 import ProgressArea from './components/ProgressArea';
 import ResultArea from './components/ResultArea';
 import ResultCard from './components/ResultCard';
+import NotFoundMessage from './components/NotFoundMessage';
+import ToastContainer, { ToastMessage } from './components/ToastContainer';
 import { TabType, Tribunal, LogEntry, ProcessingState, ProcessResult, ConsultaResponse, PlanilhaResponse } from './types';
 import { Play, ChevronRight } from 'lucide-react';
 
@@ -36,8 +38,21 @@ export default function App() {
   const [showResult, setShowResult] = useState(false);
   const [resultData, setResultData] = useState<ProcessResult | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const addToast = (message: string, type: ToastMessage['type']) => {
+    const id = generateId();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    return id;
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const clearTimeouts = () => {
     timeoutsRef.current.forEach(clearTimeout);
@@ -91,10 +106,28 @@ export default function App() {
           logs: addLog(prev.logs, 'Processo encontrado com sucesso!', 'success'),
         }));
         setResultData(data.dados);
+        addToast('Processo consultado com sucesso!', 'success');
         setTimeout(() => {
           setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
           setShowResult(true);
         }, 500);
+      } else if (!data.sucesso && data.erro?.includes('não encontrado')) {
+        setProcessing((prev) => ({
+          ...prev,
+          isProcessing: false,
+          isComplete: true,
+          logs: addLog(prev.logs, 'Processo não encontrado no tribunal', 'warning'),
+        }));
+        const notFoundResult: ProcessResult = {
+          tribunal,
+          numero_cnj: processNumber,
+          erro: data.erro,
+        };
+        setResultData(notFoundResult);
+        addToast('Processo não encontrado', 'warning');
+        setTimeout(() => {
+          setShowResult(true);
+        }, 300);
       } else {
         throw new Error(data.erro || 'Não foi possível consultar o processo');
       }
@@ -107,6 +140,7 @@ export default function App() {
           hasError: true,
           logs: addLog(prev.logs, errorMsg, 'error'),
         }));
+        addToast(errorMsg, 'error');
       }
     }
   }, [canProcess, processNumber, tribunal]);
@@ -119,6 +153,8 @@ export default function App() {
     setShowResult(false);
     setResultData(null);
     setDownloadUrl(null);
+    setProcessedCount(0);
+    setTotalCount(0);
     setProcessing({ isProcessing: true, progress: 0, logs: [], isComplete: false, hasError: false });
 
     try {
@@ -143,6 +179,9 @@ export default function App() {
       const data: PlanilhaResponse = await response.json();
 
       if (data.sucesso) {
+        setTotalCount(data.total_processados || 0);
+        setProcessedCount(data.total_processados || 0);
+
         setProcessing((prev) => ({
           ...prev,
           progress: 100,
@@ -156,6 +195,7 @@ export default function App() {
             ...prev,
             logs: addLog(prev.logs, `Processos com sucesso: ${data.total_sucesso}`, 'success'),
           }));
+          addToast(`${data.total_sucesso} processo(s) processado(s) com sucesso!`, 'success');
         }
 
         if (data.total_erro && data.total_erro > 0) {
@@ -183,6 +223,7 @@ export default function App() {
           hasError: true,
           logs: addLog(prev.logs, errorMsg, 'error'),
         }));
+        addToast(errorMsg, 'error');
       }
     }
   }, [selectedFile]);
@@ -205,6 +246,8 @@ export default function App() {
     setShowResult(false);
     setResultData(null);
     setDownloadUrl(null);
+    setProcessedCount(0);
+    setTotalCount(0);
   };
 
   const handleTabChange = (tab: TabType) => {
@@ -297,18 +340,46 @@ export default function App() {
                   logs={processing.logs}
                   isComplete={processing.isComplete}
                   hasError={processing.hasError}
+                  processedCount={processedCount}
+                  totalCount={totalCount}
                 />
               </div>
             </div>
           )}
 
           {showResult && activeTab === 'single' && resultData && (
-            <div className="rounded-2xl bg-slate-800/20 border border-emerald-500/20 backdrop-blur-sm overflow-hidden animate-slideUp">
-              <div className="px-5 py-4 border-b border-emerald-500/10 bg-emerald-500/5">
-                <h3 className="text-sm font-semibold text-emerald-300">Resultado da Consulta</h3>
+            <div
+              className={`rounded-2xl backdrop-blur-sm overflow-hidden animate-slideUp ${
+                resultData.erro
+                  ? 'bg-slate-800/20 border border-amber-500/20'
+                  : 'bg-slate-800/20 border border-emerald-500/20'
+              }`}
+            >
+              <div
+                className={`px-5 py-4 border-b backdrop-blur-sm ${
+                  resultData.erro
+                    ? 'border-amber-500/10 bg-amber-500/5'
+                    : 'border-emerald-500/10 bg-emerald-500/5'
+                }`}
+              >
+                <h3
+                  className={`text-sm font-semibold ${
+                    resultData.erro ? 'text-amber-300' : 'text-emerald-300'
+                  }`}
+                >
+                  {resultData.erro ? 'Resultado da Busca' : 'Resultado da Consulta'}
+                </h3>
               </div>
               <div className="p-5 space-y-4">
-                <ResultCard result={resultData} />
+                {resultData.erro ? (
+                  <NotFoundMessage
+                    processNumber={resultData.numero_cnj}
+                    tribunal={resultData.tribunal}
+                    onTryAgain={handleReset}
+                  />
+                ) : (
+                  <ResultCard result={resultData} />
+                )}
                 <button
                   onClick={handleReset}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-sm font-medium transition-all duration-200"
@@ -346,6 +417,8 @@ export default function App() {
           </div>
         </footer>
       </div>
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

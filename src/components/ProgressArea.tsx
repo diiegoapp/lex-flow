@@ -7,6 +7,8 @@ interface ProgressAreaProps {
   logs: LogEntry[];
   isComplete: boolean;
   hasError: boolean;
+  processedCount?: number;
+  totalCount?: number;
 }
 
 const levelConfig: Record<LogLevel, { icon: React.ReactNode; color: string; bg: string }> = {
@@ -32,7 +34,14 @@ const levelConfig: Record<LogLevel, { icon: React.ReactNode; color: string; bg: 
   },
 };
 
-export default function ProgressArea({ progress, logs, isComplete, hasError }: ProgressAreaProps) {
+export default function ProgressArea({
+  progress,
+  logs,
+  isComplete,
+  hasError,
+  processedCount,
+  totalCount,
+}: ProgressAreaProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,6 +49,7 @@ export default function ProgressArea({ progress, logs, isComplete, hasError }: P
   }, [logs]);
 
   const statusColor = hasError ? 'from-red-500 to-red-600' : isComplete ? 'from-emerald-500 to-emerald-600' : 'from-blue-500 to-violet-600';
+  const showCounter = totalCount && totalCount > 1;
 
   return (
     <div className="space-y-4">
@@ -58,6 +68,11 @@ export default function ProgressArea({ progress, logs, isComplete, hasError }: P
             <span className="text-sm font-medium text-slate-200">
               {hasError ? 'Erro no processamento' : isComplete ? 'Processamento concluído' : 'Processando...'}
             </span>
+            {showCounter && (
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-700/50 text-xs text-slate-300 font-medium tabular-nums">
+                {processedCount ?? 0} de {totalCount}
+              </span>
+            )}
           </div>
           <span className={`text-sm font-bold tabular-nums ${hasError ? 'text-red-400' : isComplete ? 'text-emerald-400' : 'text-blue-400'}`}>
             {progress}%
