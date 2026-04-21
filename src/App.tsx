@@ -107,10 +107,9 @@ export default function App() {
         }));
         setResultData(data.dados);
         if (data.arquivo_url) {
-          const fixedUrl = data.arquivo_url.replace(
-            'http://localhost:3001',
-            'https://earlier-surprising-briefing-immunology.trycloudflare.com'
-          );
+          const fixedUrl = data.arquivo_url
+            .replace('http://localhost:3001', 'https://earlier-surprising-briefing-immunology.trycloudflare.com')
+            .replace('http://127.0.0.1:3001', 'https://earlier-surprising-briefing-immunology.trycloudflare.com');
           setDownloadUrl(fixedUrl);
         }
         addToast('Processo consultado com sucesso!', 'success');
