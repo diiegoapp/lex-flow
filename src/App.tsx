@@ -380,7 +380,7 @@ export default function App() {
                   />
                 ) : (
                   <>
-                    <ResultCard result={resultData} />
+                    <ResultCard result={resultData} arquivoUrl={downloadUrl} />
                     {downloadUrl && (
                       <ResultArea
                         fileName={`resultado_${resultData.numero_cnj.replace(/\D/g, '').slice(0, 7)}.xlsx`}
