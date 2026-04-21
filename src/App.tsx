@@ -14,7 +14,7 @@ import { Play, ChevronRight } from 'lucide-react';
 const generateId = () => Math.random().toString(36).slice(2);
 const getTimestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-const API_BASE_URL = 'https://valid-representations-lace-replies.trycloudflare.com';
+const API_BASE_URL = 'https://earlier-surprising-briefing-immunology.trycloudflare.com';
 
 const addLog = (logs: LogEntry[], message: string, level: LogEntry['level']) => [
   ...logs,
@@ -109,7 +109,7 @@ export default function App() {
         if (data.arquivo_url) {
           const fixedUrl = data.arquivo_url.replace(
             'http://localhost:3001',
-            'https://valid-representations-lace-replies.trycloudflare.com'
+            'https://earlier-surprising-briefing-immunology.trycloudflare.com'
           );
           setDownloadUrl(fixedUrl);
         }
@@ -215,7 +215,7 @@ export default function App() {
         if (data.arquivo_url) {
           const fixedUrl = data.arquivo_url.replace(
             'http://localhost:3001',
-            'https://valid-representations-lace-replies.trycloudflare.com'
+            'https://earlier-surprising-briefing-immunology.trycloudflare.com'
           );
           setDownloadUrl(fixedUrl);
         } else {
