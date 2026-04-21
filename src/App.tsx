@@ -8,7 +8,7 @@ import ResultArea from './components/ResultArea';
 import ResultCard from './components/ResultCard';
 import NotFoundMessage from './components/NotFoundMessage';
 import ToastContainer, { ToastMessage } from './components/ToastContainer';
-import { TabType, Tribunal, LogEntry, ProcessingState, ProcessResult, ConsultaResponse, PlanilhaResponse } from './types';
+import { TabType, Tribunal, LogEntry, ProcessingState, ProcessResult, ConsultaResponse, IniciarPlanilhaResponse, StatusResponse } from './types';
 import { Play, ChevronRight } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).slice(2);
@@ -172,65 +172,109 @@ export default function App() {
         logs: addLog(prev.logs, `Carregando arquivo: ${selectedFile.name}`, 'info'),
       }));
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000);
-      const response = await fetch(`${API_BASE_URL}/processar-planilha`, {
+      const initResponse = await fetch(`${API_BASE_URL}/iniciar-planilha`, {
         method: 'POST',
         body: formData,
-        signal: controller.signal,
+        signal: abortControllerRef.current.signal,
       });
-      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
+      if (!initResponse.ok) {
+        throw new Error(`Erro HTTP: ${initResponse.status}`);
       }
 
-      const data: PlanilhaResponse = await response.json();
+      const { job_id }: IniciarPlanilhaResponse = await initResponse.json();
 
-      if (data.sucesso) {
-        setTotalCount(data.total_processados || 0);
-        setProcessedCount(data.total_processados || 0);
+      setProcessing((prev) => ({
+        ...prev,
+        logs: addLog(prev.logs, `Job iniciado. Aguardando processamento...`, 'info'),
+      }));
 
-        setProcessing((prev) => ({
-          ...prev,
-          progress: 100,
-          logs: [
-            ...addLog(prev.logs, `Total processados: ${data.total_processados || 0}`, 'info'),
-          ],
-        }));
+      const poll = () => {
+        const timeoutId = setTimeout(async () => {
+          try {
+            if (abortControllerRef.current?.signal.aborted) return;
 
-        if (data.total_sucesso && data.total_sucesso > 0) {
-          setProcessing((prev) => ({
-            ...prev,
-            logs: addLog(prev.logs, `Processos com sucesso: ${data.total_sucesso}`, 'success'),
-          }));
-          addToast(`${data.total_sucesso} processo(s) processado(s) com sucesso!`, 'success');
-        }
+            const statusResponse = await fetch(`${API_BASE_URL}/status/${job_id}`, {
+              signal: abortControllerRef.current?.signal,
+            });
 
-        if (data.total_erro && data.total_erro > 0) {
-          setProcessing((prev) => ({
-            ...prev,
-            logs: addLog(prev.logs, `Processos com erro: ${data.total_erro}`, 'warning'),
-          }));
-        }
+            if (!statusResponse.ok) {
+              throw new Error(`Erro HTTP: ${statusResponse.status}`);
+            }
 
-        if (data.arquivo_url) {
-          const fixedUrl = data.arquivo_url.replace(
-            'http://localhost:3001',
-            'https://earlier-surprising-briefing-immunology.trycloudflare.com'
-          );
-          setDownloadUrl(fixedUrl);
-        } else {
-          setDownloadUrl(null);
-        }
+            const status: StatusResponse = await statusResponse.json();
 
-        setTimeout(() => {
-          setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
-          setShowResult(true);
-        }, 500);
-      } else {
-        throw new Error(data.erro || 'Erro ao processar planilha');
-      }
+            if (status.mensagem) {
+              setProcessing((prev) => ({
+                ...prev,
+                progress: status.progresso ?? prev.progress,
+                logs: addLog(prev.logs, status.mensagem!, 'info'),
+              }));
+            }
+
+            if (status.status === 'concluido') {
+              const total = status.total_processados || 0;
+              setTotalCount(total);
+              setProcessedCount(total);
+
+              setProcessing((prev) => ({
+                ...prev,
+                progress: 100,
+                logs: addLog(prev.logs, `Total processados: ${total}`, 'info'),
+              }));
+
+              if (status.total_sucesso && status.total_sucesso > 0) {
+                setProcessing((prev) => ({
+                  ...prev,
+                  logs: addLog(prev.logs, `Processos com sucesso: ${status.total_sucesso}`, 'success'),
+                }));
+                addToast(`${status.total_sucesso} processo(s) processado(s) com sucesso!`, 'success');
+              }
+
+              if (status.total_erro && status.total_erro > 0) {
+                setProcessing((prev) => ({
+                  ...prev,
+                  logs: addLog(prev.logs, `Processos com erro: ${status.total_erro}`, 'warning'),
+                }));
+              }
+
+              if (status.arquivo_url) {
+                const fixedUrl = status.arquivo_url
+                  .replace('http://localhost:3001', 'https://earlier-surprising-briefing-immunology.trycloudflare.com')
+                  .replace('http://127.0.0.1:3001', 'https://earlier-surprising-briefing-immunology.trycloudflare.com');
+                setDownloadUrl(fixedUrl);
+              } else {
+                setDownloadUrl(null);
+              }
+
+              setTimeout(() => {
+                setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
+                setShowResult(true);
+              }, 500);
+
+            } else if (status.status === 'erro') {
+              throw new Error(status.erro || 'Erro ao processar planilha');
+            } else {
+              poll();
+            }
+          } catch (err: any) {
+            if (err.name !== 'AbortError') {
+              const errorMsg = err.message || 'Erro ao processar planilha';
+              setProcessing((prev) => ({
+                ...prev,
+                isProcessing: false,
+                hasError: true,
+                logs: addLog(prev.logs, errorMsg, 'error'),
+              }));
+              addToast(errorMsg, 'error');
+            }
+          }
+        }, 5000);
+
+        timeoutsRef.current.push(timeoutId);
+      };
+
+      poll();
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         const errorMsg = err.message || 'Erro ao processar planilha';

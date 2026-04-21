@@ -52,3 +52,18 @@ export interface PlanilhaResponse {
   total_erro?: number;
   erro?: string;
 }
+
+export interface IniciarPlanilhaResponse {
+  job_id: string;
+}
+
+export interface StatusResponse {
+  status: 'pendente' | 'processando' | 'concluido' | 'erro';
+  progresso?: number;
+  mensagem?: string;
+  arquivo_url?: string;
+  total_processados?: number;
+  total_sucesso?: number;
+  total_erro?: number;
+  erro?: string;
+}
