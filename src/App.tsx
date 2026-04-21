@@ -172,11 +172,14 @@ export default function App() {
         logs: addLog(prev.logs, `Carregando arquivo: ${selectedFile.name}`, 'info'),
       }));
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
       const response = await fetch(`${API_BASE_URL}/processar-planilha`, {
         method: 'POST',
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Erro HTTP: ${response.status}`);
