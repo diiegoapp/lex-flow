@@ -14,7 +14,7 @@ import { Play, ChevronRight } from 'lucide-react';
 const generateId = () => Math.random().toString(36).slice(2);
 const getTimestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'http://82.197.67.129:3001';
 
 const addLog = (logs: LogEntry[], message: string, level: LogEntry['level']) => [
   ...logs,
