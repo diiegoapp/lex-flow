@@ -39,10 +39,7 @@ export default function ResultCard({ result, arquivoUrl }: ResultCardProps) {
   const handleDownload = () => {
     const url = arquivoUrl ?? (result as any).arquivo_url;
     if (!url) return;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `resultado_${d.numero_cnj?.replace(/\D/g, '').slice(0, 7) ?? 'processo'}.xlsx`;
-    a.click();
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const downloadUrl = arquivoUrl ?? (result as any).arquivo_url;

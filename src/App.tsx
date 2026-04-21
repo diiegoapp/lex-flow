@@ -258,10 +258,7 @@ export default function App() {
 
   const handleDownload = () => {
     if (downloadUrl) {
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `lexflow_resultado_${Date.now()}.xlsx`;
-      a.click();
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
