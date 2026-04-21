@@ -106,7 +106,13 @@ export default function App() {
           logs: addLog(prev.logs, 'Processo encontrado com sucesso!', 'success'),
         }));
         setResultData(data.dados);
-        if (data.arquivo_url) setDownloadUrl(data.arquivo_url);
+        if (data.arquivo_url) {
+          const fixedUrl = data.arquivo_url.replace(
+            'http://localhost:3001',
+            'https://valid-representations-lace-replies.trycloudflare.com'
+          );
+          setDownloadUrl(fixedUrl);
+        }
         addToast('Processo consultado com sucesso!', 'success');
         setTimeout(() => {
           setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
@@ -206,7 +212,15 @@ export default function App() {
           }));
         }
 
-        setDownloadUrl(data.arquivo_url || null);
+        if (data.arquivo_url) {
+          const fixedUrl = data.arquivo_url.replace(
+            'http://localhost:3001',
+            'https://valid-representations-lace-replies.trycloudflare.com'
+          );
+          setDownloadUrl(fixedUrl);
+        } else {
+          setDownloadUrl(null);
+        }
 
         setTimeout(() => {
           setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
