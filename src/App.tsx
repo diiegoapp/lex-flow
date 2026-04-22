@@ -14,7 +14,7 @@ import { Play, ChevronRight } from 'lucide-react';
 const generateId = () => Math.random().toString(36).slice(2);
 const getTimestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-const API_BASE_URL = 'https://sig-underlying-enquiry-subscribers.trycloudflare.com';
+const API_BASE_URL = 'https://off-tradition-rhythm-ended.trycloudflare.com';
 
 const addLog = (logs: LogEntry[], message: string, level: LogEntry['level']) => [
   ...logs,
@@ -108,8 +108,8 @@ export default function App() {
         setResultData(data.dados);
         if (data.arquivo_url) {
           const fixedUrl = data.arquivo_url
-            .replace('http://localhost:3001', 'https://sig-underlying-enquiry-subscribers.trycloudflare.com')
-            .replace('http://127.0.0.1:3001', 'https://sig-underlying-enquiry-subscribers.trycloudflare.com');
+            .replace('http://localhost:3001', 'https://off-tradition-rhythm-ended.trycloudflare.com')
+            .replace('http://127.0.0.1:3001', 'https://off-tradition-rhythm-ended.trycloudflare.com');
           setDownloadUrl(fixedUrl);
         }
         addToast('Processo consultado com sucesso!', 'success');
@@ -240,8 +240,8 @@ export default function App() {
 
               if (status.arquivo_url) {
                 const fixedUrl = status.arquivo_url
-                  .replace('http://localhost:3001', 'https://sig-underlying-enquiry-subscribers.trycloudflare.com')
-                  .replace('http://127.0.0.1:3001', 'https://sig-underlying-enquiry-subscribers.trycloudflare.com');
+                  .replace('http://localhost:3001', 'https://off-tradition-rhythm-ended.trycloudflare.com')
+                  .replace('http://127.0.0.1:3001', 'https://off-tradition-rhythm-ended.trycloudflare.com');
                 setDownloadUrl(fixedUrl);
               } else {
                 setDownloadUrl(null);
