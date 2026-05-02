@@ -1,4 +1,4 @@
-import { FileSearch, ChevronDown } from 'lucide-react';
+import { FileSearch } from 'lucide-react';
 import { Tribunal } from '../types';
 
 interface SingleProcessTabProps {
@@ -88,25 +88,6 @@ export default function SingleProcessTab({
               </span>
             </button>
           ))}
-        </div>
-      </div>
-
-      <div className="hidden">
-        <div className="relative">
-          <select
-            value={tribunal}
-            onChange={(e) => onTribunalChange(e.target.value as Tribunal)}
-            className="w-full px-4 py-3.5 pr-10 rounded-xl bg-slate-800/60 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
-          >
-            {tribunais.map((t) => (
-              <option key={t.value} value={t.value} className="bg-slate-900">
-                {t.label} — {t.description}
-              </option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-            <ChevronDown className="w-4 h-4 text-slate-500" />
-          </div>
         </div>
       </div>
     </div>

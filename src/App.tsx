@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import Header from './components/Header';
 import TabNav from './components/TabNav';
 import SpreadsheetTab from './components/SpreadsheetTab';
@@ -7,287 +7,178 @@ import ProgressArea from './components/ProgressArea';
 import ResultArea from './components/ResultArea';
 import ResultCard from './components/ResultCard';
 import NotFoundMessage from './components/NotFoundMessage';
-import ToastContainer, { ToastMessage } from './components/ToastContainer';
-import { TabType, Tribunal, LogEntry, ProcessingState, ProcessResult, ConsultaResponse, IniciarPlanilhaResponse, StatusResponse } from './types';
+import ToastContainer from './components/ToastContainer';
+import { TabType, Tribunal, ProcessResult, ConsultaResponse, IniciarPlanilhaResponse, StatusResponse } from './types';
+import { useApi } from './hooks/useApi';
+import { useProcessing } from './hooks/useProcessing';
+import { useToast } from './hooks/useToast';
 import { Play, ChevronRight } from 'lucide-react';
-
-const generateId = () => Math.random().toString(36).slice(2);
-const getTimestamp = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-const API_BASE_URL = 'https://lexflow-api.datrym.com';
-
-const addLog = (logs: LogEntry[], message: string, level: LogEntry['level']) => [
-  ...logs,
-  { id: generateId(), timestamp: getTimestamp(), message, level },
-];
-
-const initialProcessingState: ProcessingState = {
-  isProcessing: false,
-  progress: 0,
-  logs: [],
-  isComplete: false,
-  hasError: false,
-};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('spreadsheet');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processNumber, setProcessNumber] = useState('');
   const [tribunal, setTribunal] = useState<Tribunal>('STJ');
-  const [processing, setProcessing] = useState<ProcessingState>(initialProcessingState);
   const [showResult, setShowResult] = useState(false);
   const [resultData, setResultData] = useState<ProcessResult | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const addToast = (message: string, type: ToastMessage['type']) => {
-    const id = generateId();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    return id;
-  };
+  const { request, abort, normalizeUrl } = useApi();
+  const { processing, addLog, setProgress, start, complete, reset: resetProcessing } = useProcessing();
+  const { toasts, addToast, removeToast } = useToast();
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const clearTimeouts = () => {
-    timeoutsRef.current.forEach(clearTimeout);
-    timeoutsRef.current = [];
-  };
-
-  const canProcess = activeTab === 'spreadsheet' ? !!selectedFile : processNumber.replace(/\D/g, '').length >= 20;
+  const canProcess =
+    activeTab === 'spreadsheet'
+      ? !!selectedFile
+      : processNumber.replace(/\D/g, '').length >= 20;
 
   const processSingleConsulta = useCallback(async () => {
     if (!canProcess) return;
 
-    clearTimeouts();
-    abortControllerRef.current = new AbortController();
+    start();
     setShowResult(false);
     setResultData(null);
     setDownloadUrl(null);
-    setProcessing({ isProcessing: true, progress: 0, logs: [], isComplete: false, hasError: false });
 
     try {
-      setProcessing((prev) => ({
-        ...prev,
-        logs: addLog(prev.logs, 'Conectando ao servidor...', 'info'),
-      }));
+      addLog('Conectando ao servidor...', 'info');
 
-      const response = await fetch(`${API_BASE_URL}/consulta`, {
+      const data = await request<ConsultaResponse>('/consulta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           numero_cnj: processNumber.replace(/\D/g, ''),
           tribunal,
         }),
-        signal: abortControllerRef.current.signal,
       });
 
-      setProcessing((prev) => ({
-        ...prev,
-        progress: 50,
-        logs: addLog(prev.logs, 'Consultando tribunal...', 'info'),
-      }));
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const data: ConsultaResponse = await response.json();
+      setProgress(50);
+      addLog('Consultando tribunal...', 'info');
 
       if (data.sucesso && data.dados) {
-        setProcessing((prev) => ({
-          ...prev,
-          progress: 100,
-          logs: addLog(prev.logs, 'Processo encontrado com sucesso!', 'success'),
-        }));
+        setProgress(100);
+        addLog('Processo encontrado com sucesso!', 'success');
         setResultData(data.dados);
+
         if (data.arquivo_url) {
-          const fixedUrl = data.arquivo_url
-            .replace('http://localhost:3001', 'https://lexflow-api.datrym.com')
-            .replace('http://127.0.0.1:3001', 'https://lexflow-api.datrym.com');
-          setDownloadUrl(fixedUrl);
+          setDownloadUrl(normalizeUrl(data.arquivo_url));
         }
+
         addToast('Processo consultado com sucesso!', 'success');
         setTimeout(() => {
-          setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
+          complete(false);
           setShowResult(true);
         }, 500);
       } else if (!data.sucesso && data.erro?.includes('não encontrado')) {
-        setProcessing((prev) => ({
-          ...prev,
-          isProcessing: false,
-          isComplete: true,
-          logs: addLog(prev.logs, 'Processo não encontrado no tribunal', 'warning'),
-        }));
-        const notFoundResult: ProcessResult = {
-          tribunal,
-          numero_cnj: processNumber,
-          erro: data.erro,
-        };
-        setResultData(notFoundResult);
+        addLog('Processo não encontrado no tribunal', 'warning');
+        setResultData({ tribunal, numero_cnj: processNumber, erro: data.erro });
         addToast('Processo não encontrado', 'warning');
-        setTimeout(() => {
-          setShowResult(true);
-        }, 300);
+        complete(false);
+        setTimeout(() => setShowResult(true), 300);
       } else {
         throw new Error(data.erro || 'Não foi possível consultar o processo');
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        const errorMsg = err.message || 'Erro ao consultar o processo';
-        setProcessing((prev) => ({
-          ...prev,
-          isProcessing: false,
-          hasError: true,
-          logs: addLog(prev.logs, errorMsg, 'error'),
-        }));
-        addToast(errorMsg, 'error');
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        const msg = err.message || 'Erro ao consultar o processo';
+        addLog(msg, 'error');
+        addToast(msg, 'error');
+        complete(true);
       }
     }
-  }, [canProcess, processNumber, tribunal]);
+  }, [canProcess, processNumber, tribunal, request, normalizeUrl, addLog, setProgress, start, complete, addToast]);
 
   const processSpreadsheet = useCallback(async () => {
     if (!selectedFile) return;
 
-    clearTimeouts();
-    abortControllerRef.current = new AbortController();
+    start();
     setShowResult(false);
     setResultData(null);
     setDownloadUrl(null);
     setProcessedCount(0);
     setTotalCount(0);
-    setProcessing({ isProcessing: true, progress: 0, logs: [], isComplete: false, hasError: false });
 
     try {
       const formData = new FormData();
       formData.append('arquivo', selectedFile);
 
-      setProcessing((prev) => ({
-        ...prev,
-        logs: addLog(prev.logs, `Carregando arquivo: ${selectedFile.name}`, 'info'),
-      }));
+      addLog(`Carregando arquivo: ${selectedFile.name}`, 'info');
 
-      const initResponse = await fetch(`${API_BASE_URL}/iniciar-planilha`, {
+      const { job_id } = await request<IniciarPlanilhaResponse>('/iniciar-planilha', {
         method: 'POST',
         body: formData,
-        signal: abortControllerRef.current.signal,
       });
 
-      if (!initResponse.ok) {
-        throw new Error(`Erro HTTP: ${initResponse.status}`);
-      }
-
-      const { job_id }: IniciarPlanilhaResponse = await initResponse.json();
-
-      setProcessing((prev) => ({
-        ...prev,
-        logs: addLog(prev.logs, `Job iniciado. Aguardando processamento...`, 'info'),
-      }));
+      addLog('Job iniciado. Aguardando processamento...', 'info');
 
       const poll = () => {
-        const timeoutId = setTimeout(async () => {
+        setTimeout(async () => {
           try {
-            if (abortControllerRef.current?.signal.aborted) return;
-
-            const statusResponse = await fetch(`${API_BASE_URL}/status/${job_id}`, {
-              signal: abortControllerRef.current?.signal,
-            });
-
-            if (!statusResponse.ok) {
-              throw new Error(`Erro HTTP: ${statusResponse.status}`);
-            }
-
-            const status: StatusResponse = await statusResponse.json();
+            const status = await request<StatusResponse>(`/status/${job_id}`);
 
             if (status.mensagem) {
-              setProcessing((prev) => ({
-                ...prev,
-                progress: status.progresso ?? prev.progress,
-                logs: addLog(prev.logs, status.mensagem!, 'info'),
-              }));
+              addLog(status.mensagem, 'info');
+            }
+
+            if (status.progresso !== undefined) {
+              setProgress(status.progresso);
+            }
+
+            if (status.total_processados !== undefined) {
+              setProcessedCount(status.total_processados);
+              setTotalCount(status.total_processados);
             }
 
             if (status.status === 'concluido') {
-              const total = status.total_processados || 0;
+              const total = status.total_processados ?? 0;
               setTotalCount(total);
               setProcessedCount(total);
-
-              setProcessing((prev) => ({
-                ...prev,
-                progress: 100,
-                logs: addLog(prev.logs, `Total processados: ${total}`, 'info'),
-              }));
+              setProgress(100);
+              addLog(`Total processados: ${total}`, 'info');
 
               if (status.total_sucesso && status.total_sucesso > 0) {
-                setProcessing((prev) => ({
-                  ...prev,
-                  logs: addLog(prev.logs, `Processos com sucesso: ${status.total_sucesso}`, 'success'),
-                }));
+                addLog(`Processos com sucesso: ${status.total_sucesso}`, 'success');
                 addToast(`${status.total_sucesso} processo(s) processado(s) com sucesso!`, 'success');
               }
 
               if (status.total_erro && status.total_erro > 0) {
-                setProcessing((prev) => ({
-                  ...prev,
-                  logs: addLog(prev.logs, `Processos com erro: ${status.total_erro}`, 'warning'),
-                }));
+                addLog(`Processos com erro: ${status.total_erro}`, 'warning');
               }
 
-              if (status.arquivo_url) {
-                const fixedUrl = status.arquivo_url
-                  .replace('http://localhost:3001', 'https://lexflow-api.datrym.com')
-                  .replace('http://127.0.0.1:3001', 'https://lexflow-api.datrym.com');
-                setDownloadUrl(fixedUrl);
-              } else {
-                setDownloadUrl(null);
-              }
+              setDownloadUrl(status.arquivo_url ? normalizeUrl(status.arquivo_url) : null);
 
               setTimeout(() => {
-                setProcessing((prev) => ({ ...prev, isProcessing: false, isComplete: true }));
+                complete(false);
                 setShowResult(true);
               }, 500);
-
             } else if (status.status === 'erro') {
               throw new Error(status.erro || 'Erro ao processar planilha');
             } else {
               poll();
             }
-          } catch (err: any) {
-            if (err.name !== 'AbortError') {
-              const errorMsg = err.message || 'Erro ao processar planilha';
-              setProcessing((prev) => ({
-                ...prev,
-                isProcessing: false,
-                hasError: true,
-                logs: addLog(prev.logs, errorMsg, 'error'),
-              }));
-              addToast(errorMsg, 'error');
+          } catch (err: unknown) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+              const msg = err.message || 'Erro ao processar planilha';
+              addLog(msg, 'error');
+              addToast(msg, 'error');
+              complete(true);
             }
           }
         }, 5000);
-
-        timeoutsRef.current.push(timeoutId);
       };
 
       poll();
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        const errorMsg = err.message || 'Erro ao processar planilha';
-        setProcessing((prev) => ({
-          ...prev,
-          isProcessing: false,
-          hasError: true,
-          logs: addLog(prev.logs, errorMsg, 'error'),
-        }));
-        addToast(errorMsg, 'error');
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        const msg = err.message || 'Erro ao processar planilha';
+        addLog(msg, 'error');
+        addToast(msg, 'error');
+        complete(true);
       }
     }
-  }, [selectedFile]);
+  }, [selectedFile, request, normalizeUrl, addLog, setProgress, start, complete, addToast]);
 
   const handleProcess = useCallback(() => {
     if (activeTab === 'single') {
@@ -297,30 +188,27 @@ export default function App() {
     }
   }, [activeTab, processSingleConsulta, processSpreadsheet]);
 
-  const handleReset = () => {
-    clearTimeouts();
-    abortControllerRef.current?.abort();
+  const handleReset = useCallback(() => {
+    abort();
     setSelectedFile(null);
     setProcessNumber('');
     setTribunal('STJ');
-    setProcessing(initialProcessingState);
+    resetProcessing();
     setShowResult(false);
     setResultData(null);
     setDownloadUrl(null);
     setProcessedCount(0);
     setTotalCount(0);
-  };
+  }, [abort, resetProcessing]);
 
-  const handleTabChange = (tab: TabType) => {
+  const handleTabChange = useCallback((tab: TabType) => {
     handleReset();
     setActiveTab(tab);
-  };
+  }, [handleReset]);
 
-  const handleDownload = () => {
-    if (downloadUrl) {
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
+  const handleDownload = useCallback(() => {
+    if (downloadUrl) window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+  }, [downloadUrl]);
 
   const showProgress = processing.isProcessing || processing.isComplete || processing.hasError;
 

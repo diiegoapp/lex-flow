@@ -17,7 +17,6 @@ export interface ProcessingState {
   logs: LogEntry[];
   isComplete: boolean;
   hasError: boolean;
-  resultFileName?: string;
 }
 
 export interface ProcessResult {
@@ -28,6 +27,8 @@ export interface ProcessResult {
   relator?: string;
   assunto?: string;
   ultima_fase?: string;
+  pauta?: string;
+  prioritario?: 'COMUM' | 'PRIORITÁRIO';
   inss_recorrente?: boolean;
   tema_sugerido?: string;
   subtema_sugerido?: string;
@@ -42,15 +43,6 @@ export interface ConsultaResponse {
   total_processados?: number;
   total_sucesso?: number;
   total_erro?: number;
-}
-
-export interface PlanilhaResponse {
-  sucesso: boolean;
-  arquivo_url?: string;
-  total_processados?: number;
-  total_sucesso?: number;
-  total_erro?: number;
-  erro?: string;
 }
 
 export interface IniciarPlanilhaResponse {
